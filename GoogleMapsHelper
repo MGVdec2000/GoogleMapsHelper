@@ -102,12 +102,12 @@ namespace GoogleMapsHelper
             }
         }
 
-        public static string PathString(List<PositionModel> positions, int skip)
+        public static string PathString(List<PositionModel> positions, int skip = 0)
         {
             StringBuilder pathBuilder = new("&path=");
             for (int i = 0; i < positions.Count; i += skip)
             {
-                pathBuilder.Append($"{(i == 0 ? "" : "|")}{positions[i].Latitude:0.000},{positions[i].Longitude:0.000}");
+                pathBuilder.Append($"{(i == 0 ? "" : "|")}{positions[i].Latitude:0.0000},{positions[i].Longitude:0.0000}");
             }
             return pathBuilder.ToString();
         }
