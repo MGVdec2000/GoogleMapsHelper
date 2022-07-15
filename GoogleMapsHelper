@@ -1,0 +1,115 @@
+using AtdAnalysisHubLib.DataModels;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Text;
+
+namespace GoogleMapsHelper
+{
+    public static class GoogleMapsHelpers
+    {
+        public static string EncodePolyLine(List<PositionModel> positions, int skip = 0)
+        {
+            skip++;
+            StringBuilder output = new("&path=enc:");
+            string latitudeString = EncodePoint(positions[0].Latitude);
+            string longitudeString = EncodePoint(positions[0].Longitude);
+            output.Append(latitudeString);
+            output.Append(longitudeString);
+            for (int i = skip; i < positions.Count; i += skip)
+            {
+                double latitudeDiff = positions[i].Latitude - positions[i - skip].Latitude;
+                double longitudeDiff = positions[i].Longitude - positions[i - skip].Longitude;
+                output.Append(EncodePoint(latitudeDiff));
+                output.Append(EncodePoint(longitudeDiff));
+            }
+            return output.ToString();
+        }
+
+        private static string EncodePoint(double offset)
+        {
+            uint intOffset = (uint)Math.Abs(Math.Round(offset * 1e5, 0));
+            if (offset < 0)
+            {
+                // Two's complement
+                intOffset = ~intOffset + 1;
+            }
+            intOffset <<= 1;
+            if (offset < 0)
+            {
+                intOffset = ~intOffset;
+            }
+            List<BitArray> chunks = new();
+            int binaryLength = Convert.ToString(intOffset, 2).Length;
+            var numOfChunks = (int)Math.Ceiling(binaryLength / 5.0);
+            BitArray fullArray = new(new int[] { (int)intOffset });
+            for (int i = 0; i < numOfChunks * 5; i += 5)
+            {
+                chunks.Add(new BitArray(new bool[] { fullArray.Get(i + 4), fullArray.Get(i + 3), fullArray.Get(i + 2), fullArray.Get(i + 1), fullArray.Get(i) }));
+            }
+            chunks = ReverseChunks(chunks);
+            for (int i = 0; i < chunks.Count; i++)
+            {
+                chunks[i] = new BitArray(new bool[] { i != 0, chunks[i].Get(0), chunks[i].Get(1), chunks[i].Get(2), chunks[i].Get(3), chunks[i].Get(4) });
+            }
+            uint[] intValues = GetIntegerValues(chunks);
+            string output = "";
+            for (int i = intValues.Length - 1; i >= 0; i--)
+            {
+                output += (char)(intValues[i] + 63);
+            }
+            return output;
+        }
+
+        private static List<BitArray> ReverseChunks(List<BitArray> chunks)
+        {
+            List<BitArray> output = new();
+            for (int i = 0; i < chunks.Count; i++)
+            {
+                output.Add(chunks[chunks.Count - 1 - i]);
+            }
+            return output;
+        }
+
+        private static uint[] GetIntegerValues(List<BitArray> chunks)
+        {
+            uint[] output = new uint[chunks.Count];
+            int i = 0;
+            foreach (BitArray chunk in chunks)
+            {
+                Reverse(chunk);
+                if (chunk.Length > 32)
+                    throw new ArgumentException("Argument length shall be at most 32 bits.");
+
+                uint[] array = new uint[1];
+                chunk.CopyTo(array, 0);
+                output[i] = array[0];
+                i++;
+            }
+            return output;
+        }
+
+        private static void Reverse(BitArray array)
+        {
+            int length = array.Length;
+            int mid = (length / 2);
+
+            for (int i = 0; i < mid; i++)
+            {
+                bool bit = array[i];
+                array[i] = array[length - i - 1];
+                array[length - i - 1] = bit;
+            }
+        }
+
+        public static string PathString(List<PositionModel> positions, int skip)
+        {
+            StringBuilder pathBuilder = new("&path=");
+            for (int i = 0; i < positions.Count; i += skip)
+            {
+                pathBuilder.Append($"{(i == 0 ? "" : "|")}{positions[i].Latitude:0.000},{positions[i].Longitude:0.000}");
+            }
+            return pathBuilder.ToString();
+        }
+    }
+}
